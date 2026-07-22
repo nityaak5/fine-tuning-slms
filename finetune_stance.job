@@ -1,0 +1,38 @@
+#!/bin/bash
+
+#SBATCH --job-name=finetune_stance
+#SBATCH --partition=gpu_a100
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-node=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=01:00:00
+
+
+source venv/bin/activate
+export HF_HOME=/scratch-shared/$USER/.cache_dir/
+# Requires `huggingface-cli login` to have been run once (see README) so that
+# push_to_hub_merged() in finetune_stance.py can authenticate. Do not hardcode a
+# token in this file.
+
+# Qwen3-1.7B-Instruct (not -Base) -- continuing from the same instruct-tuned checkpoint
+# that underperformed zero-shot on stance detection, so --no_from_foundation_model uses
+# its native chat template (see prepare_stance_data.py for why that needs role/content).
+python finetune_stance.py \
+                          --pretrained_model_name_or_path unsloth/Qwen3-1.7B-unsloth-bnb-4bit \
+                          --no_from_foundation_model \
+                          --data_dir nityaak/semeval-stance-conversations \
+                          --push_to_hub_id nityaak/qwen3-1.7b-stance-semeval-qlora \
+                          --output_dir /scratch-shared/$USER/finetune_results/ \
+                          --max_seq_length 512 \
+                          --per_device_train 8 \
+                          --per_device_eval 8 \
+                          --num_train_epochs 1 \
+                          --optim adamw_8bit \
+                          --bf16 \
+                          --gradient_accumulation_steps 4 \
+                          --packing \
+                          --logging_steps 10 \
+
+# QLoRA is the default (load_in_4bit=True). For a LoRA experiment, duplicate this
+# file and add `--no_load_in_4bit` to the python call above.
