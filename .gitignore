@@ -4,3 +4,5 @@ __pycache__/
 .env
 prepared_stance_data.jsonl
 wandb/
+logs/*.out
+logs/*.err
