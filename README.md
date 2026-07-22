@@ -53,6 +53,7 @@ python -m venv venv
 source venv/bin/activate
 pip install -U pip
 pip install "unsloth[cu121-ampere-torch240] @ git+https://github.com/unslothai/unsloth.git"
+pip install carbontracker   # tracks training energy/CO2, logged to <output_dir>/carbontracker/
 huggingface-cli login   # once, so training can push merged models to the Hub
 ```
 

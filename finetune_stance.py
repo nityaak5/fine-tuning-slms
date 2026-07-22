@@ -1,13 +1,27 @@
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 from trl import SFTConfig, SFTTrainer
 from unsloth import FastLanguageModel
 from unsloth.chat_templates import get_chat_template
-from transformers import HfArgumentParser
+from transformers import HfArgumentParser, TrainerCallback
 
 from datasets import load_dataset
+
+
+class CarbonTrackerCallback(TrainerCallback):
+    """Drives a CarbonTracker instance from TRL's epoch hooks."""
+
+    def __init__(self, tracker):
+        self.tracker = tracker
+
+    def on_epoch_begin(self, args, state, control, **kwargs):
+        self.tracker.epoch_start()
+
+    def on_epoch_end(self, args, state, control, **kwargs):
+        self.tracker.epoch_end()
 
 
 @dataclass
@@ -57,6 +71,12 @@ class ExperimentArguments:
                 "result to this HuggingFace Hub repo id (e.g. 'your-username/stance-model-v1') "
                 "after training. Requires being logged in (see README) or an HF_TOKEN env var."
             )
+        },
+    )
+    carbon_tracking: bool = field(
+        default=True,
+        metadata={
+            "help": "Track training energy/CO2 usage via CarbonTracker, logged to <output_dir>/carbontracker/."
         },
     )
 
@@ -150,10 +170,29 @@ def main(user_config, sft_config):
     # Patch the model with parameter-efficient finetuning
     model = apply_lora(model, sft_config.max_seq_length)
 
+    tracker = None
+    carbon_log_dir = None
+    if user_config.carbon_tracking:
+        try:
+            from carbontracker.tracker import CarbonTracker
+
+            carbon_log_dir = Path(sft_config.output_dir) / "carbontracker"
+            carbon_log_dir.mkdir(parents=True, exist_ok=True)
+            tracker = CarbonTracker(
+                epochs=int(sft_config.num_train_epochs),
+                components="gpu",
+                log_dir=str(carbon_log_dir),
+                monitor_epochs=-1,
+            )
+        except Exception as exc:
+            print(f"CarbonTracker not available: {exc}")
+            tracker = None
+
     trainer = SFTTrainer(
         model=model,
         args=sft_config,
         train_dataset=dataset,
+        callbacks=[CarbonTrackerCallback(tracker)] if tracker is not None else None,
     )
 
     trainer_stats = trainer.train()
@@ -163,6 +202,13 @@ def main(user_config, sft_config):
     print(
         f"{round(trainer_stats.metrics['train_runtime']/60, 2)} minutes used for training."
     )
+
+    if tracker is not None:
+        try:
+            tracker.stop()
+        except Exception:
+            pass
+        print(f"CarbonTracker logs written to {carbon_log_dir}")
 
     if user_config.push_to_hub_id:
         model.push_to_hub_merged(
