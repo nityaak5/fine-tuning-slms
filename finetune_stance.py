@@ -1,11 +1,13 @@
+import unsloth  # noqa: F401  -- must be imported before trl/transformers/peft so its patches apply
+from unsloth import FastLanguageModel
+from unsloth.chat_templates import get_chat_template
+
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
 from trl import SFTConfig, SFTTrainer
-from unsloth import FastLanguageModel
-from unsloth.chat_templates import get_chat_template
 from transformers import HfArgumentParser, TrainerCallback
 
 from datasets import load_dataset
@@ -161,6 +163,21 @@ def main(user_config, sft_config):
         dtype=None,  # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+
         load_in_4bit=user_config.load_in_4bit,
     )
+
+    # Continuing from an already instruct-tuned checkpoint can leave tokenizer.eos_token
+    # as an unresolved placeholder (e.g. '<EOS_TOKEN>') rather than the model's real
+    # end-of-turn token. Restore it from the tokenizer's own special tokens if so, before
+    # SFTTrainer validates it against the vocabulary.
+    if tokenizer.convert_tokens_to_ids(tokenizer.eos_token) is None:
+        fixed_eos_token = tokenizer.special_tokens_map.get("eos_token")
+        if fixed_eos_token is None or tokenizer.convert_tokens_to_ids(fixed_eos_token) is None:
+            raise ValueError(
+                f"tokenizer.eos_token ({tokenizer.eos_token!r}) is not in the vocabulary, and "
+                f"tokenizer.special_tokens_map has no usable fallback ({tokenizer.special_tokens_map!r})"
+            )
+        print(f"Fixing broken tokenizer.eos_token ({tokenizer.eos_token!r} -> {fixed_eos_token!r})")
+        tokenizer.eos_token = fixed_eos_token
+        sft_config.eos_token = fixed_eos_token
 
     # Map the dataset to the right template
     dataset = prepare_dataset(dataset, tokenizer, user_config.from_foundation_model)

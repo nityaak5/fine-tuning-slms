@@ -29,7 +29,6 @@ python finetune_stance.py \
                           --push_to_hub_id nityaak/qwen3-1.7b-stance-semeval-qlora \
                           --output_dir /scratch-shared/$USER/finetune_results/ \
                           --max_length 512 \
-                          --eos_token "<|im_end|>" \
                           --per_device_train 8 \
                           --per_device_eval 8 \
                           --num_train_epochs 1 \
