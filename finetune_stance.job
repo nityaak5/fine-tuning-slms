@@ -14,7 +14,12 @@
 
 
 source venv/bin/activate
-export HF_HOME=/scratch-shared/$USER/.cache_dir/
+# HF_HUB_CACHE (not HF_HOME) keeps downloaded models off the home-directory quota --
+# HF_HOME also controls where the login token lives ($HF_HOME/token), and overriding
+# it here previously pointed push_to_hub_merged() at a path `hf auth login` never
+# wrote to, causing a 401 at push time. Leaving HF_HOME at its default keeps the
+# token findable while still redirecting the (large) model/dataset cache.
+export HF_HUB_CACHE=/scratch-shared/$USER/.cache_dir/hub
 # Requires `hf auth login` to have been run once (see README) so that
 # push_to_hub_merged() in finetune_stance.py can authenticate. Do not hardcode a
 # token in this file.
