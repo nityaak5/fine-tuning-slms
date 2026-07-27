@@ -15,7 +15,7 @@
 
 source venv/bin/activate
 export HF_HOME=/scratch-shared/$USER/.cache_dir/
-# Requires `huggingface-cli login` to have been run once (see README) so that
+# Requires `hf auth login` to have been run once (see README) so that
 # push_to_hub_merged() in finetune_stance.py can authenticate. Do not hardcode a
 # token in this file.
 
@@ -33,7 +33,7 @@ python finetune_stance.py \
                           --per_device_eval 8 \
                           --num_train_epochs 1 \
                           --optim adamw_8bit \
-                          --bf16 \
+                          --bf16 True \
                           --gradient_accumulation_steps 4 \
                           --packing \
                           --logging_steps 10 \
