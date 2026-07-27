@@ -156,7 +156,7 @@ def main(user_config, sft_config):
     # Load model
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=user_config.pretrained_model_name_or_path,
-        max_seq_length=sft_config.max_seq_length,
+        max_seq_length=sft_config.max_length,
         device_map="auto",
         dtype=None,  # None for auto detection. Float16 for Tesla T4, V100, Bfloat16 for Ampere+
         load_in_4bit=user_config.load_in_4bit,
@@ -168,7 +168,7 @@ def main(user_config, sft_config):
     sft_config.dataset_text_field = "text"
 
     # Patch the model with parameter-efficient finetuning
-    model = apply_lora(model, sft_config.max_seq_length)
+    model = apply_lora(model, sft_config.max_length)
 
     tracker = None
     carbon_log_dir = None

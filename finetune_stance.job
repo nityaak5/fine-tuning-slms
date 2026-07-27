@@ -28,7 +28,7 @@ python finetune_stance.py \
                           --data_dir nityaak/semeval-stance-conversations \
                           --push_to_hub_id nityaak/qwen3-1.7b-stance-semeval-qlora \
                           --output_dir /scratch-shared/$USER/finetune_results/ \
-                          --max_seq_length 512 \
+                          --max_length 512 \
                           --per_device_train 8 \
                           --per_device_eval 8 \
                           --num_train_epochs 1 \
