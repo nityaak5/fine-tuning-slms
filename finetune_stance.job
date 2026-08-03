@@ -24,24 +24,36 @@ export HF_HUB_CACHE=/scratch-shared/$USER/.cache_dir/hub
 # push_to_hub_merged() in finetune_stance.py can authenticate. Do not hardcode a
 # token in this file.
 
+# Only line to change when switching datasets/experiments -- push_to_hub_id and
+# output_dir below are both derived from it, so nothing else needs editing.
+DATA_DIR="nityaak/stance-matrix-semeval"
+
+# Everything after the last "/" in DATA_DIR, e.g. "stance-matrix-semeval" --
+# used to build both the model repo id and a per-experiment output directory.
+DATASET_NAME="${DATA_DIR##*/}"
+PUSH_TO_HUB_ID="nityaak/qwen3-1.7b-${DATASET_NAME}-qlora"
+OUTPUT_DIR="/scratch-shared/$USER/finetune_results/${DATASET_NAME}/"
+
 # Qwen3-1.7B-Instruct (not -Base) -- continuing from the same instruct-tuned checkpoint
 # that underperformed zero-shot on stance detection, so --no_from_foundation_model uses
 # its native chat template (see prepare_stance_data.py for why that needs role/content).
 python finetune_stance.py \
                           --pretrained_model_name_or_path unsloth/Qwen3-1.7B-unsloth-bnb-4bit \
                           --no_from_foundation_model \
-                          --data_dir nityaak/semeval-stance-conversations \
-                          --push_to_hub_id nityaak/qwen3-1.7b-stance-semeval-qlora \
-                          --output_dir /scratch-shared/$USER/finetune_results/ \
+                          --data_dir "$DATA_DIR" \
+                          --push_to_hub_id "$PUSH_TO_HUB_ID" \
+                          --output_dir "$OUTPUT_DIR" \
                           --max_length 512 \
                           --per_device_train 8 \
                           --per_device_eval 8 \
                           --num_train_epochs 1 \
                           --optim adamw_8bit \
                           --bf16 True \
-                          --gradient_accumulation_steps 4 \
+                          --gradient_accumulation_steps 2 \
                           --packing \
                           --logging_steps 10 \
+                          --weight_decay 0.01 \
+                          --warmup_ratio 0.1 \
 
 # QLoRA is the default (load_in_4bit=True). For a LoRA experiment, duplicate this
 # file and add `--no_load_in_4bit` to the python call above.

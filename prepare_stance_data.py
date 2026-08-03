@@ -11,12 +11,17 @@ because finetune_stance.py is run with --no_from_foundation_model when continuin
 an already instruct-tuned checkpoint (e.g. unsloth/Qwen3-1.7B-unsloth-bnb-4bit), which
 applies the tokenizer's own native chat template -- that template expects role/content.
 
-Prompt and output format mirror `stance_classification_prompt_no_label_definitions` in
-the topic_modeling_paper repo's genai_functions.py (STANCE_PROMPT_NAME =
-"default_no_label_definitions") -- that's the prompt used to establish the zero-shot
-Qwen3-1.7B baseline this fine-tune is meant to improve on. The fine-tuned model must be
-tested with that exact same prompt/JSON format, so if that testing prompt ever changes,
-this template needs to change with it.
+Prompt and output format mirror `stance_classification_task_definition` in the
+topic_modeling_paper repo's genai_functions.py -- a task-definition prompt with an
+explicit, broadened NONE clause covering (a) off-topic documents, (b) neutral/balanced
+documents, and (c) genuinely ambiguous cases, so it lines up with what STANCE_LABEL_MAP
+below actually folds into "NONE" (NEUTRAL, UNCLEAR, UNRELATED, ...). The fine-tuned model
+must be tested with that exact same prompt/JSON format, so if that testing prompt ever
+changes, this template needs to change with it.
+
+NOTE: as of 2026-07-29, genai_functions.py's `stance_classification_task_definition` still
+has the older, narrower "cannot know" NONE wording -- it needs the same broadened NONE
+clause applied there before re-running eval, otherwise train/test prompts diverge again.
 """
 import argparse
 import json
@@ -26,11 +31,19 @@ import pandas as pd
 from datasets import Dataset
 
 STANCE_PROMPT_TEMPLATE = (
-    "Your task is to determine the stance of the following document toward the given query.\n\n"
+    "Stance classification is the task of determining the expressed or implied opinion, "
+    "or stance, of a document toward a certain, specified target. "
+    "Analyze the following document and determine its stance toward the provided query.\n\n"
     "QUERY: {target}\n\n"
     "DOCUMENT: {text}\n\n"
     'Return valid JSON in exactly this format: {{"stance": "FAVOR"}}\n'
     'The "stance" value must be exactly one of: "FAVOR", "AGAINST", "NONE".\n'
+    'Use "FAVOR" only when the author is definitely in favor of the query. '
+    'Use "AGAINST" only when the author is definitely against the query. '
+    'Use "NONE" if any of the following holds: (a) the document does not discuss the query '
+    "at all, (b) the document discusses it but the author takes no clear side "
+    "(neutral/balanced), or (c) the author's position cannot be determined with confidence. "
+    "Do not guess from indirect hints.\n"
 )
 
 # Mirrors StanceDetectionInterface.canonicalize_stance_label in topic_modeling_paper --

@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .env
 prepared_stance_data.jsonl
+data/samples/
 wandb/
 logs/*.out
 logs/*.err
