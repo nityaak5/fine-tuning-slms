@@ -30,13 +30,20 @@ trained models move via private HuggingFace Hub repos -- nothing is copied by ha
   [Unsloth](https://unsloth.ai/) + TRL's `SFTTrainer`. QLoRA vs LoRA is a single
   flag (`--load_in_4bit` / `--no_load_in_4bit`), not a separate script. After
   training, merges the LoRA adapter into the base model and pushes it to a
-  private HF model repo, along with `training_summary.json` and
-  `loss_curve.png` -- same `gpu_stats` field names (`gpu_name`,
-  `memory_used_mb`, `memory_total_mb`, `memory_utilization_percent`,
-  `runtime_seconds`) as the `summary.json` the Tilburg vLLM eval pipeline
-  already writes per inference run, plus the hyperparameters used, TRL's
-  training metrics, and the LoRA weight-update check -- so each pushed model
-  repo is self-documenting about how (and how expensively) it was trained.
+  private HF model repo, along with `training_summary.json`, `loss_curve.png`,
+  and a `carbontracker/` folder of the actual CarbonTracker logs -- same
+  `gpu_stats` field names (`gpu_name`, `memory_used_mb`, `memory_total_mb`,
+  `memory_utilization_percent`, `runtime_seconds`) as the `summary.json` the
+  Tilburg vLLM eval pipeline already writes per inference run, plus the
+  hyperparameters used, TRL's training metrics, and the LoRA weight-update
+  check -- so each pushed model repo is self-documenting about how (and how
+  expensively) it was trained. Also forces deterministic decoding
+  (`do_sample=False`) as the model's saved `generation_config.json` default,
+  overriding the base checkpoint's inherited stochastic sampling settings --
+  this model is for deterministic JSON classification, not creative
+  generation (the Tilburg pipeline already passes its own `temperature=0`
+  explicitly, so this doesn't change current eval behavior; it's a safety
+  net for anyone loading the model without setting their own sampling params).
 - **`finetune_stance.job`** -- SLURM script that runs `finetune_stance.py` on a
   single non-exclusive A100 (18 cores + 1 GPU, ~128 SBU/hr).
 - **`build_experiment_matrix.py`** -- run *locally*, no GPU needed. Builds all

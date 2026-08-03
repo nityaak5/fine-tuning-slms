@@ -187,7 +187,7 @@ def verify_weights_updated(model, before_snapshot):
     return {"all_changed": not unchanged, "unchanged_params": unchanged, "abs_diff_per_param": diffs}
 
 
-def build_training_summary(user_config, sft_config, trainer_stats, weight_check):
+def build_training_summary(user_config, sft_config, trainer_stats, weight_check, carbon_log_dir):
     # Mirrors the summary.json structure the Tilburg vLLM eval pipeline already writes
     # per inference run (genai_functions.py) -- same gpu_stats field names -- so training
     # runs get the same at-a-glance observability inference runs already have.
@@ -230,6 +230,13 @@ def build_training_summary(user_config, sft_config, trainer_stats, weight_check)
         "weight_verification": {
             "all_changed": weight_check["all_changed"],
             "unchanged_params": weight_check["unchanged_params"],
+        },
+        "carbon_tracking": {
+            "enabled": carbon_log_dir is not None,
+            # Mirrors the Tilburg eval pipeline's summary.json pattern -- points at
+            # where the logs live rather than embedding parsed numbers directly.
+            "log_dir": "carbontracker" if carbon_log_dir is not None else None,
+            "note": "See carbontracker/ in this repo for actual consumption (time, energy, CO2eq).",
         },
     }
 
@@ -345,13 +352,25 @@ def main(user_config, sft_config):
             pass
         print(f"CarbonTracker logs written to {carbon_log_dir}")
 
-    training_summary = build_training_summary(user_config, sft_config, trainer_stats, weight_check)
+    training_summary = build_training_summary(user_config, sft_config, trainer_stats, weight_check, carbon_log_dir)
     summary_path = Path(sft_config.output_dir) / "training_summary.json"
     with open(summary_path, "w") as f:
         json.dump(training_summary, f, indent=2)
     print(f"Training summary written to {summary_path}")
 
     if user_config.push_to_hub_id:
+        # This model is fine-tuned for deterministic JSON stance classification, not
+        # creative generation -- override the base checkpoint's inherited stochastic
+        # sampling defaults (Qwen's own temperature=0.6/top_p=0.95/top_k=20) with greedy
+        # decoding as the *saved* default. The Tilburg eval pipeline already passes its
+        # own temperature=0 explicitly (which always overrides this), so this doesn't
+        # change current eval behavior -- it's a safety net for anyone loading this model
+        # without setting their own sampling params.
+        model.generation_config.do_sample = False
+        model.generation_config.temperature = 1.0
+        model.generation_config.top_p = 1.0
+        model.generation_config.top_k = 50
+
         model.push_to_hub_merged(
             user_config.push_to_hub_id,
             tokenizer,
@@ -376,7 +395,13 @@ def main(user_config, sft_config):
                 path_in_repo="loss_curve.png",
                 repo_id=user_config.push_to_hub_id,
             )
-        print(f"training_summary.json and loss_curve.png attached to https://huggingface.co/{user_config.push_to_hub_id}")
+        if carbon_log_dir is not None and Path(carbon_log_dir).exists():
+            api.upload_folder(
+                folder_path=str(carbon_log_dir),
+                path_in_repo="carbontracker",
+                repo_id=user_config.push_to_hub_id,
+            )
+        print(f"training_summary.json, loss_curve.png, and carbontracker/ attached to https://huggingface.co/{user_config.push_to_hub_id}")
 
 
 if __name__ == "__main__":
