@@ -30,6 +30,7 @@ pip install uv
 uv pip install unsloth --torch-backend=cu128
 python -c "import torch; assert torch.cuda.is_available()"   # must print nothing (no AssertionError)
 pip install carbontracker
+pip install matplotlib
 hf auth login
 ```
 Then leave the GPU node:
@@ -53,7 +54,8 @@ tail -f logs/finetune_stance_<jobid>.out   # live output while it runs
 ## 6. Check budget
 ```bash
 accinfo -u $USER
-budget-overview -p gpu_a100
+budget-overview -p gpu_a100   # most accurate remaining balance -- prefer this one
+accuse -u $USER                # SBU consumption over time (monthly by default, -d for daily)
 ```
 
 ## 7. Pull code updates later

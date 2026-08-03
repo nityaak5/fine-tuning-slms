@@ -46,12 +46,15 @@ trained models move via private HuggingFace Hub repos -- nothing is copied by ha
   per combo, and pushes each to its own public repo
   (`nityaak/stance-matrix-*`) -- push commented out by default, uncomment
   when ready.
-- **`finetune_stance_sweep.job`** -- runs *multiple* Qwen3-1.7B experiments
-  (different training datasets) as one SLURM job array (`sbatch` once, SLURM
-  fans out each row of the `DATA_DIRS`/`PUSH_IDS` arrays as an independent
+- **`finetune_stance_sweep.job`** -- runs the full experiment matrix (all 7
+  non-empty subsets of `{semeval, mtcsd, ezstance}`, from
+  `build_experiment_matrix.py`'s pushed datasets) as one SLURM job array
+  (`sbatch` once, SLURM fans out each row of `DATA_DIRS` as an independent
   task, running in parallel where A100 capacity allows) -- instead of
   duplicating `finetune_stance.job` per variant, which drifts out of sync.
-  Edit the arrays + `--array` range to add/remove experiments.
+  `push_to_hub_id`/`output_dir` are derived from each row the same way as
+  `finetune_stance.job`, so only `DATA_DIRS` + `--array` need editing to
+  add/remove experiments.
 - **`notebooks/`** -- learning/exploration notebooks (each defines its own logic
   inline rather than importing from the scripts above, on purpose):
   - `01_create_single_dataset.ipynb` / `02_combine_multiple_datasets.ipynb` --

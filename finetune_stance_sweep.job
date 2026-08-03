@@ -11,46 +11,47 @@
 #SBATCH --error=logs/%x_%A_%a.err
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=n.kalra@tilburguniversity.edu
-#SBATCH --array=0-1
+#SBATCH --array=0-6
 
-# Runs several Qwen3-1.7B fine-tuning experiments (different training datasets) as one
-# SLURM job array instead of duplicating finetune_stance.job per variant (which would
-# drift out of sync the moment one copy gets fixed and the others don't). Submit this
-# ONCE (`sbatch finetune_stance_sweep.job`) and SLURM queues every row below as an
-# independent task -- as many run in parallel as A100 capacity allows, the rest just
-# queue. Each row is one complete experiment config; add/remove rows in the arrays
-# below and update --array above to match (0-indexed, inclusive -- 2 rows = 0-1).
+# Runs the full experiment matrix -- all 7 non-empty subsets of {semeval, mtcsd,
+# ezstance} -- as one SLURM job array instead of duplicating finetune_stance.job per
+# variant (which would drift out of sync the moment one copy gets fixed and the
+# others don't). Submit this ONCE (`sbatch finetune_stance_sweep.job`) and SLURM
+# queues every row below as an independent task -- as many run in parallel as A100
+# capacity allows, the rest just queue.
 #
-# Rows below use what's actually ready right now: only
-# `nityaak/semeval-stance-conversations` and `nityaak/stance-combined-v1` exist as
-# training datasets so far -- mtcsd-only, EZ-STANCE-only, and all-three still need
-# their own conversations-formatted dataset prepped + pushed first (not yet done).
+# Only DATA_DIRS needs editing to add/remove experiments (update --array to match,
+# 0-indexed inclusive -- 7 rows = 0-6) -- push_to_hub_id and output_dir are both
+# derived from each row the same way as finetune_stance.job, so there's nothing else
+# to keep in sync per row.
 
 source venv/bin/activate
 export HF_HUB_CACHE=/scratch-shared/$USER/.cache_dir/hub
 
-# --- experiment rows -- index i across every array below = one experiment ---
+# --- experiment rows -- one entry per task ---
 DATA_DIRS=(
-    "nityaak/semeval-stance-conversations"
-    "nityaak/stance-combined-v1"
-)
-PUSH_IDS=(
-    "nityaak/qwen3-1.7b-stance-semeval-qlora"
-    "nityaak/qwen3-1.7b-stance-combined-qlora"
+    "nityaak/stance-matrix-semeval"
+    "nityaak/stance-matrix-mtcsd"
+    "nityaak/stance-matrix-ezstance"
+    "nityaak/stance-matrix-semeval-mtcsd"
+    "nityaak/stance-matrix-semeval-ezstance"
+    "nityaak/stance-matrix-mtcsd-ezstance"
+    "nityaak/stance-matrix-semeval-mtcsd-ezstance"
 )
 
-i=$SLURM_ARRAY_TASK_ID
-DATA_DIR="${DATA_DIRS[$i]}"
-PUSH_TO_HUB_ID="${PUSH_IDS[$i]}"
+DATA_DIR="${DATA_DIRS[$SLURM_ARRAY_TASK_ID]}"
+DATASET_NAME="${DATA_DIR##*/}"
+PUSH_TO_HUB_ID="nityaak/qwen3-1.7b-${DATASET_NAME}-qlora"
+OUTPUT_DIR="/scratch-shared/$USER/finetune_results/${DATASET_NAME}/"
 
-echo "Experiment $i: data_dir=$DATA_DIR push_to_hub_id=$PUSH_TO_HUB_ID"
+echo "Experiment $SLURM_ARRAY_TASK_ID: data_dir=$DATA_DIR push_to_hub_id=$PUSH_TO_HUB_ID"
 
 python finetune_stance.py \
                           --pretrained_model_name_or_path unsloth/Qwen3-1.7B-unsloth-bnb-4bit \
                           --no_from_foundation_model \
                           --data_dir "$DATA_DIR" \
                           --push_to_hub_id "$PUSH_TO_HUB_ID" \
-                          --output_dir /scratch-shared/$USER/finetune_results/sweep_$i/ \
+                          --output_dir "$OUTPUT_DIR" \
                           --max_length 512 \
                           --per_device_train 8 \
                           --per_device_eval 8 \
