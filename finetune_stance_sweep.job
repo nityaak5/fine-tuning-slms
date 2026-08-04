@@ -24,6 +24,10 @@
 # 0-indexed inclusive -- 7 rows = 0-6) -- push_to_hub_id and output_dir are both
 # derived from each row the same way as finetune_stance.job, so there's nothing else
 # to keep in sync per row.
+#
+# To run only specific rows (e.g. just the 2 new ones below, indices 7-8, without
+# resubmitting the original 7), override --array at submit time -- it beats the
+# #SBATCH default above: `sbatch --array=7-8 finetune_stance_sweep.job`
 
 source venv/bin/activate
 export HF_HUB_CACHE=/scratch-shared/$USER/.cache_dir/hub
@@ -37,6 +41,8 @@ DATA_DIRS=(
     "nityaak/stance-matrix-semeval-ezstance"
     "nityaak/stance-matrix-mtcsd-ezstance"
     "nityaak/stance-matrix-semeval-mtcsd-ezstance"
+    "nityaak/mtcsd-balanced-8430-stance-conversations"
+    "nityaak/ezstance-balanced-8430-stance-conversations"
 )
 
 DATA_DIR="${DATA_DIRS[$SLURM_ARRAY_TASK_ID]}"
