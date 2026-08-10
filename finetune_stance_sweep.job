@@ -41,13 +41,13 @@ DATA_DIRS=(
 
 DATA_DIR="${DATA_DIRS[$SLURM_ARRAY_TASK_ID]}"
 DATASET_NAME="${DATA_DIR##*/}"
-PUSH_TO_HUB_ID="nityaak/phi4mini-${DATASET_NAME}-qlora"
-OUTPUT_DIR="/scratch-shared/$USER/finetune_results/phi4mini-${DATASET_NAME}/"
+PUSH_TO_HUB_ID="nityaak/qwen3-4b-${DATASET_NAME}-qlora"
+OUTPUT_DIR="/scratch-shared/$USER/finetune_results/qwen3-4b-${DATASET_NAME}/"
 
 echo "Experiment $SLURM_ARRAY_TASK_ID: data_dir=$DATA_DIR push_to_hub_id=$PUSH_TO_HUB_ID"
 
 python finetune_stance.py \
-                          --pretrained_model_name_or_path unsloth/Phi-4-mini-instruct-unsloth-bnb-4bit \
+                          --pretrained_model_name_or_path unsloth/Qwen3-4B-Instruct-2507-unsloth-bnb-4bit \
                           --no_from_foundation_model \
                           --data_dir "$DATA_DIR" \
                           --push_to_hub_id "$PUSH_TO_HUB_ID" \
