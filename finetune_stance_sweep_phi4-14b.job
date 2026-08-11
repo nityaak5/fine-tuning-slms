@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=finetune_stance_sweep
+#SBATCH --job-name=finetune_stance_sweep_phi4_14b
 #SBATCH --partition=gpu_a100
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
@@ -13,17 +13,15 @@
 #SBATCH --mail-user=n.kalra@tilburguniversity.edu
 #SBATCH --array=0-6
 
-# Runs the full experiment matrix -- all 7 non-empty subsets of {semeval, mtcsd,
-# ezstance} -- as one SLURM job array instead of duplicating finetune_stance.job per
-# variant (which would drift out of sync the moment one copy gets fixed and the
-# others don't). Submit this ONCE (`sbatch finetune_stance_sweep.job`) and SLURM
-# queues every row below as an independent task -- as many run in parallel as A100
-# capacity allows, the rest just queue.
+# Phi-4 (14B, not Phi-4-mini) across all 7 combo-matrix datasets. Separate file from
+# finetune_stance_sweep.job (which is being used for Qwen3-8B in parallel) so the two
+# can run concurrently on separate GPU allocations without one overwriting the other's
+# in-progress state -- learned the hard way when swapping models in the same file
+# clobbered an earlier run's HF repo commit history.
 #
-# Only DATA_DIRS needs editing to add/remove experiments (update --array to match,
-# 0-indexed inclusive -- 7 rows = 0-6) -- push_to_hub_id and output_dir are both
-# derived from each row the same way as finetune_stance.job, so there's nothing else
-# to keep in sync per row.
+# ~18GB VRAM headroom on a 40GB A100 for a 14B QLoRA run (less margin than the smaller
+# models) -- if this OOMs, halve --per_device_train and double
+# --gradient_accumulation_steps to keep the same effective batch size.
 
 source venv/bin/activate
 export HF_HUB_CACHE=/scratch-shared/$USER/.cache_dir/hub
@@ -41,13 +39,13 @@ DATA_DIRS=(
 
 DATA_DIR="${DATA_DIRS[$SLURM_ARRAY_TASK_ID]}"
 DATASET_NAME="${DATA_DIR##*/}"
-PUSH_TO_HUB_ID="nityaak/qwen3-8b-${DATASET_NAME}-qlora"
-OUTPUT_DIR="/scratch-shared/$USER/finetune_results/qwen3-8b-${DATASET_NAME}/"
+PUSH_TO_HUB_ID="nityaak/phi4-14b-${DATASET_NAME}-qlora"
+OUTPUT_DIR="/scratch-shared/$USER/finetune_results/phi4-14b-${DATASET_NAME}/"
 
 echo "Experiment $SLURM_ARRAY_TASK_ID: data_dir=$DATA_DIR push_to_hub_id=$PUSH_TO_HUB_ID"
 
 python finetune_stance.py \
-                          --pretrained_model_name_or_path unsloth/Qwen3-8B-unsloth-bnb-4bit \
+                          --pretrained_model_name_or_path unsloth/phi-4-unsloth-bnb-4bit \
                           --no_from_foundation_model \
                           --data_dir "$DATA_DIR" \
                           --push_to_hub_id "$PUSH_TO_HUB_ID" \
