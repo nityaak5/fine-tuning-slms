@@ -152,7 +152,7 @@ def apply_lora(model, max_seq_length):
         bias="none",  # Bias = "none" is currently optimized
         use_gradient_checkpointing="unsloth",
         max_seq_length=max_seq_length,
-        random_state=47,
+        random_state=42,  # unified with the other seeds used across this project (dataset shuffling, TPESampler, SFTConfig.seed)
     )
 
     return model

@@ -1,0 +1,31 @@
+#!/bin/bash
+
+#SBATCH --job-name=tune_hyperparams_mtcsd
+#SBATCH --partition=gpu_a100
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-node=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=06:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=n.kalra@tilburguniversity.edu
+
+
+source venv/bin/activate
+# Same reasoning as finetune_stance.job -- HF_HUB_CACHE (not HF_HOME) keeps the
+# downloaded 4B base model off the home-directory quota without breaking
+# `hf auth login`'s token location.
+export HF_HUB_CACHE=/scratch-shared/$USER/.cache_dir/hub
+
+# Keep in sync with #SBATCH --time above: 20 minutes under it, so the study stops
+# starting new trials before SLURM kills the job mid-trial. Both are first estimates
+# (Colab's T4 per-trial timing doesn't transfer to an A100) -- widen --time and this
+# together once real per-trial timing here is known.
+export OPTUNA_TIMEOUT_SECONDS=20400
+
+# optuna is not yet part of the base venv (unlike unsloth/trl/etc.) -- add it once
+# with the same installer used for everything else, not inline here:
+uv pip install optuna
+python tune_hyperparams_mtcsd.py
